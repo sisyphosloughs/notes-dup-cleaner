@@ -327,6 +327,13 @@ tr.eq  td{background:transparent}
 tr.del td{background:var(--del-bg)} tr.del td.lc{color:var(--del-fg)}
 tr.add td{background:var(--add-bg)} tr.add td.lc{color:var(--add-fg)}
 tr.ph  td{background:rgba(255,255,255,.013)}
+.diff-edit-area{width:100%;height:100%;resize:none;border:none;box-sizing:border-box;
+  background:var(--surface);color:var(--text);font-family:var(--font);font-size:12px;
+  line-height:1.55;padding:4px 9px;outline:none;display:block}
+.diff-edit-btn{background:var(--border);color:var(--text);padding:2px 8px;
+  border-radius:4px;border:none;cursor:pointer;font-family:var(--font);
+  font-size:11px;white-space:nowrap}
+.diff-edit-btn:hover{background:var(--accent);color:#000}
 .diff-legend{display:flex;gap:14px;padding:7px 16px;
              border-top:1px solid var(--border);font-size:11px;
              color:var(--muted);flex-shrink:0}
@@ -393,6 +400,7 @@ tr.ph  td{background:rgba(255,255,255,.013)}
     </div>
     <div class="modal-footer">
       <span class="diff-status" id="diff-status"></span>
+      <button class="btn-secondary" id="btn-recompare" onclick="reCompare()" disabled>&#8635; Erneut vergleichen</button>
       <button class="btn-accent" onclick="applyDiffChanges()">&#10003; &#196;nderungen anwenden</button>
     </div>
   </div>
@@ -601,6 +609,7 @@ function buildPane(ops, side) {
 }
 
 let DIFF_CONTEXT = null; // {files: [{path, rel, size}, ...]}
+let EDIT_CACHE = { a: null, b: null, originalA: null, originalB: null };
 
 function buildActionRow(path, fi) {
   const folderOpts = FOLDERS.map(fo =>
@@ -614,6 +623,7 @@ function buildActionRow(path, fi) {
       '<option value="">Ordner\u2026</option>' + folderOpts +
     '</select>' +
     '<button class="diff-move-btn" onclick="toggleDiffFolderSel(' + fi + ')" title="Verschieben nach\u2026">&#128193;</button>' +
+    '<button class="diff-edit-btn" onclick="toggleEdit(' + fi + ')">&#9998; Bearbeiten</button>' +
   '</div>';
 }
 
@@ -638,6 +648,86 @@ function updateDiffPath(fi) {
     disp.textContent = origFile.path;
     disp.title = origFile.path;
   }
+}
+
+function renderDiff() {
+  if (!DIFF_CONTEXT) return;
+  const textA = EDIT_CACHE.a ?? EDIT_CACHE.originalA;
+  const textB = EDIT_CACHE.b ?? EDIT_CACHE.originalB;
+  const lA = textA.split('\n');
+  const lB = textB.split('\n');
+  const ops = diffLines(lA, lB);
+
+  const pa = DIFF_CONTEXT.files[0].path;
+  const pb = DIFF_CONTEXT.files[1].path;
+  const grid = document.getElementById('diff-grid');
+  grid.innerHTML =
+    '<div class="diff-pane" id="dp-a">' +
+      buildActionRow(pa, 0) +
+      buildPane(ops,'a') +
+    '</div>' +
+    '<div class="diff-pane" id="dp-b">' +
+      buildActionRow(pb, 1) +
+      buildPane(ops,'b') +
+    '</div>';
+
+  // Synchrones Scrollen beider Panes
+  const pA = document.getElementById('dp-a');
+  const pB = document.getElementById('dp-b');
+  let lock = false;
+  pA.addEventListener('scroll', () => { if(!lock){lock=true;pB.scrollTop=pA.scrollTop;lock=false;} });
+  pB.addEventListener('scroll', () => { if(!lock){lock=true;pA.scrollTop=pB.scrollTop;lock=false;} });
+
+  updateRecompareBtn();
+}
+
+function toggleEdit(fi) {
+  const side = fi === 0 ? 'a' : 'b';
+  const pane = document.getElementById('dp-' + side);
+  const btn = pane.querySelector('.diff-edit-btn');
+  const table = pane.querySelector('table.dt');
+  const ta = pane.querySelector('.diff-edit-area');
+
+  if (ta) {
+    // Textarea -> zurueck (Inhalt ist bereits im Cache)
+    EDIT_CACHE[side] = ta.value;
+    btn.innerHTML = '&#9998; Bearbeiten';
+    // Einzelne Pane neu rendern: Diff mit aktuellem Cache
+    const textA = EDIT_CACHE.a ?? EDIT_CACHE.originalA;
+    const textB = EDIT_CACHE.b ?? EDIT_CACHE.originalB;
+    const ops = diffLines(textA.split('\n'), textB.split('\n'));
+    const newTable = document.createElement('div');
+    newTable.innerHTML = buildPane(ops, side);
+    ta.replaceWith(newTable.firstChild);
+  } else if (table) {
+    // Diff-Tabelle -> Textarea
+    const content = EDIT_CACHE[side] ?? (side === 'a' ? EDIT_CACHE.originalA : EDIT_CACHE.originalB);
+    const textarea = document.createElement('textarea');
+    textarea.className = 'diff-edit-area';
+    textarea.value = content;
+    textarea.addEventListener('input', () => {
+      EDIT_CACHE[side] = textarea.value;
+      updateRecompareBtn();
+    });
+    table.replaceWith(textarea);
+    btn.innerHTML = '&#9998; Vorschau';
+    textarea.focus();
+    updateRecompareBtn();
+  }
+}
+
+function reCompare() {
+  // Offene Textareas in Cache lesen
+  for (const side of ['a', 'b']) {
+    const ta = document.querySelector('#dp-' + side + ' .diff-edit-area');
+    if (ta) EDIT_CACHE[side] = ta.value;
+  }
+  renderDiff();
+}
+
+function updateRecompareBtn() {
+  const btn = document.getElementById('btn-recompare');
+  if (btn) btn.disabled = (EDIT_CACHE.a === null && EDIT_CACHE.b === null);
 }
 
 async function openDiff(pa, pb) {
@@ -674,27 +764,8 @@ async function openDiff(pa, pb) {
     const nameB = pb.split('/').pop();
     document.getElementById('diff-title').textContent = nameA + '  \u21d4  ' + nameB;
 
-    const lA = ra.content.split('\n');
-    const lB = rb.content.split('\n');
-    const ops = diffLines(lA, lB);
-
-    const grid = document.getElementById('diff-grid');
-    grid.innerHTML =
-      '<div class="diff-pane" id="dp-a">' +
-        buildActionRow(pa, 0) +
-        buildPane(ops,'a') +
-      '</div>' +
-      '<div class="diff-pane" id="dp-b">' +
-        buildActionRow(pb, 1) +
-        buildPane(ops,'b') +
-      '</div>';
-
-    // Synchrones Scrollen beider Panes
-    const pA = document.getElementById('dp-a');
-    const pB = document.getElementById('dp-b');
-    let lock = false;
-    pA.addEventListener('scroll', () => { if(!lock){lock=true;pB.scrollTop=pA.scrollTop;lock=false;} });
-    pB.addEventListener('scroll', () => { if(!lock){lock=true;pA.scrollTop=pB.scrollTop;lock=false;} });
+    EDIT_CACHE = { a: null, b: null, originalA: ra.content, originalB: rb.content };
+    renderDiff();
 
   } catch(e) {
     document.getElementById('diff-grid').innerHTML =
@@ -705,6 +776,7 @@ async function openDiff(pa, pb) {
 function closeDiff() {
   document.getElementById('diff-modal').classList.remove('show');
   DIFF_CONTEXT = null;
+  EDIT_CACHE = { a: null, b: null, originalA: null, originalB: null };
 }
 
 function findFileInfo(path) {
@@ -737,13 +809,38 @@ async function applyDiffChanges() {
     }
   });
 
-  if (toDelete.length === 0 && toMove.length === 0) {
+  const hasEdits = EDIT_CACHE.a !== null || EDIT_CACHE.b !== null;
+  if (toDelete.length === 0 && toMove.length === 0 && !hasEdits) {
     status.textContent = 'Keine \u00c4nderungen ausgew\u00e4hlt.';
     return;
   }
 
   status.textContent = 'Wird ausgef\u00fchrt\u2026';
   const messages = [];
+
+  // 0. Bearbeitete Dateien speichern
+  for (const [side, fi] of [['a',0],['b',1]]) {
+    const edited = EDIT_CACHE[side];
+    if (edited === null) continue;
+    const path = DIFF_CONTEXT.files[fi].path;
+    // Nicht speichern wenn Datei geloescht wird
+    const row = document.querySelector('.diff-action-row[data-side="' + fi + '"]');
+    if (row.querySelector('.diff-del-cb').checked) continue;
+    try {
+      const r = await fetch('/save', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ path: path, content: edited })
+      });
+      const res = await r.json();
+      if (res.ok) {
+        messages.push('Gespeichert: ' + path.split('/').pop());
+      } else {
+        messages.push('Speichern fehlgeschlagen: ' + res.error);
+      }
+    } catch(e) {
+      messages.push('Speichern fehlgeschlagen: ' + e);
+    }
+  }
 
   // 1. L\u00f6schen
   if (toDelete.length > 0) {
@@ -945,6 +1042,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send(200, "application/json",
                            json.dumps({"ok": True,
                                        "dest": str(target)}).encode())
+            except Exception as e:
+                self._send(500, "application/json",
+                           json.dumps({"ok": False, "error": str(e)}).encode())
+
+        elif self.path == "/save":
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length))
+            fpath  = Path(body.get("path", ""))
+            content = body.get("content", "")
+            try:
+                if not fpath.is_file():
+                    raise FileNotFoundError(f"Datei nicht gefunden: {fpath}")
+                fpath.resolve().relative_to(self.root.resolve())
+                fpath.write_text(content, encoding="utf-8")
+                self._send(200, "application/json",
+                           json.dumps({"ok": True}).encode())
             except Exception as e:
                 self._send(500, "application/json",
                            json.dumps({"ok": False, "error": str(e)}).encode())
