@@ -265,11 +265,6 @@ section.active{display:block}
                                 flex-shrink:0;cursor:pointer}
 .file-path{flex:1;word-break:break-all}
 .file-meta{color:var(--muted);font-size:11px;white-space:nowrap}
-.btn-eye{background:none;border:1px solid var(--border);color:var(--muted);
-         padding:3px 8px;border-radius:5px;cursor:pointer;font-size:12px;
-         flex-shrink:0;font-family:var(--font)}
-.btn-eye:hover{border-color:var(--accent);color:var(--accent)}
-
 /* Toolbar */
 .toolbar{position:sticky;bottom:0;background:var(--bg);
          border-top:1px solid var(--border);padding:11px 28px;
@@ -285,17 +280,22 @@ button:disabled{opacity:.33;cursor:not-allowed}
 .all-sel a{color:var(--accent);cursor:pointer;text-decoration:none}
 .empty{padding:36px;text-align:center;color:var(--muted)}
 
-/* Move row */
-.move-row{padding:6px 14px 8px 38px;display:flex;align-items:center;gap:8px;
-          border-bottom:1px solid var(--border);background:rgba(108,143,255,.04)}
-.move-row select{background:var(--surface2);color:var(--text);border:1px solid var(--border);
-                  border-radius:5px;padding:4px 8px;font-family:var(--font);font-size:12px;
-                  flex:1;max-width:420px}
-.btn-move{background:var(--accent);color:#000;padding:4px 12px;border-radius:5px;
-          border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600}
-.btn-move:disabled{opacity:.33;cursor:not-allowed}
-.move-ok{color:var(--ok);font-size:11px}
-.move-err{color:var(--danger);font-size:11px}
+/* Diff action controls */
+.diff-action-row{padding:6px 12px;display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;
+  position:sticky;top:0;z-index:2}
+.diff-del-label{color:var(--danger);font-size:12px;cursor:pointer;user-select:none}
+.diff-path-display{flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:5px;padding:3px 8px;font-family:var(--font);font-size:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.diff-move-btn{background:var(--accent);color:#000;padding:3px 8px;border-radius:5px;
+  border:none;cursor:pointer;font-family:var(--font);font-size:11px;font-weight:600;white-space:nowrap}
+.diff-folder-sel{background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:5px;padding:3px 8px;font-family:var(--font);font-size:11px;max-width:240px;display:none}
+.diff-folder-sel.show{display:inline-block}
+.modal-footer{padding:11px 18px;border-top:1px solid var(--border);display:flex;
+  align-items:center;gap:10px;justify-content:flex-end;flex-shrink:0}
+.diff-status{color:var(--muted);font-size:12px;margin-right:auto}
 
 /* Overlays */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);
@@ -313,20 +313,11 @@ button:disabled{opacity:.33;cursor:not-allowed}
 .btn-x:hover{color:var(--text)}
 .modal-body{overflow:auto;flex:1}
 
-/* Preview */
-#prev-modal .modal{max-width:780px}
-.preview-pre{padding:16px 20px;white-space:pre-wrap;word-break:break-all;
-             font-size:12px;line-height:1.75;color:var(--text)}
-
 /* Diff */
 #diff-modal .modal{max-width:1280px}
 .diff-grid{display:grid;grid-template-columns:1fr 1fr;height:100%;min-height:0}
 .diff-pane{overflow:auto;border-right:1px solid var(--border)}
 .diff-pane:last-child{border-right:none}
-.diff-pane-hdr{padding:7px 12px;font-size:11px;color:var(--muted);
-               border-bottom:1px solid var(--border);position:sticky;top:0;
-               background:var(--surface2);z-index:2;
-               white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.dt{width:100%;border-collapse:collapse;font-size:12px;line-height:1.55}
 table.dt td{padding:1px 0;vertical-align:top}
 td.ln{width:36px;min-width:36px;text-align:right;padding:0 7px;
@@ -385,20 +376,7 @@ tr.ph  td{background:rgba(255,255,255,.013)}
   <div id="status">W&#228;hle Dateien aus.</div>
 </div>
 
-<!-- Vorschau -->
-<div class="overlay" id="prev-modal">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h2 id="prev-title">Vorschau</h2>
-      <button class="btn-x" onclick="closePrev()">&#10005;</button>
-    </div>
-    <div class="modal-body">
-      <pre class="preview-pre" id="prev-content">Lade ...</pre>
-    </div>
-  </div>
-</div>
-
-<!-- Diff -->
+<!-- Diff / Vergleich -->
 <div class="overlay" id="diff-modal">
   <div class="modal">
     <div class="modal-hdr">
@@ -412,6 +390,10 @@ tr.ph  td{background:rgba(255,255,255,.013)}
       <span><span class="ld" style="background:var(--del-bg);border:1px solid var(--del-fg)"></span>Nur in A (links)</span>
       <span><span class="ld" style="background:var(--add-bg);border:1px solid var(--add-fg)"></span>Nur in B (rechts)</span>
       <span><span class="ld" style="background:var(--surface2);border:1px solid var(--border)"></span>Identisch</span>
+    </div>
+    <div class="modal-footer">
+      <span class="diff-status" id="diff-status"></span>
+      <button class="btn-accent" onclick="applyDiffChanges()">&#10003; &#196;nderungen anwenden</button>
     </div>
   </div>
 </div>
@@ -455,20 +437,10 @@ function simColor(p) {
 
 // ── Datei-Zeile ────────────────────────────────────────────────────────────────
 function fileRow(f, id) {
-  const ph = JSON.stringify(f.path), rh = JSON.stringify(f.rel);
-  const mid = 'mv-' + id;
   return `<div class="file-row">
     <input type="checkbox" id="${id}" data-path="${esc(f.path)}" onchange="updateBar()">
     <label for="${id}" class="file-path">${esc(f.rel)}</label>
     <span class="file-meta">${f.size}</span>
-    <button class="btn-eye" onclick="openPrev(${ph},${rh})" title="Vorschau">&#128065;</button>
-  </div>
-  <div class="move-row" id="${mid}">
-    <select class="move-sel" data-path="${esc(f.path)}" onchange="toggleMoveBtn('${mid}')">
-      <option value="">Verschieben nach\u2026</option>
-    </select>
-    <button class="btn-move" disabled onclick="doMove('${mid}')" title="Datei verschieben">Verschieben</button>
-    <span class="move-status"></span>
   </div>`;
 }
 
@@ -525,7 +497,7 @@ function switchTab(n) {
 
 // ── Toolbar ────────────────────────────────────────────────────────────────────
 function getChecked() {
-  return [...document.querySelectorAll('input[type=checkbox]:checked')]
+  return [...document.querySelectorAll('input[type=checkbox][data-path]:checked')]
          .map(c => c.dataset.path);
 }
 
@@ -540,25 +512,41 @@ function updateBar() {
 }
 
 function selAll(v) {
-  document.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=v);
+  document.querySelectorAll('input[type=checkbox][data-path]').forEach(c=>c.checked=v);
   updateBar();
 }
 
-// ── Vorschau ───────────────────────────────────────────────────────────────────
-async function openPrev(path, rel) {
-  document.getElementById('prev-title').textContent = rel;
-  document.getElementById('prev-content').textContent = 'Lade \u2026';
-  document.getElementById('prev-modal').classList.add('show');
-  try {
-    const r = await fetch('/file?path=' + encodeURIComponent(path));
-    const d = await r.json();
-    document.getElementById('prev-content').textContent =
-      d.content != null ? d.content : 'Fehler: ' + d.error;
-  } catch(e) {
-    document.getElementById('prev-content').textContent = 'Fehler: ' + e;
+// ── Hilfsfunktionen fuer DOM-Updates ──────────────────────────────────────────
+function removeFileRows(paths) {
+  const cardMap = new Map();
+  for (const path of paths) {
+    const row = findRow(path);
+    if (!row) continue;
+    const card = row.closest('.card');
+    if (!card) continue;
+    if (!cardMap.has(card)) cardMap.set(card, []);
+    cardMap.get(card).push(row);
+  }
+  for (const [card, rows] of cardMap) {
+    const totalRows = card.querySelectorAll('.file-row').length;
+    const remaining = totalRows - rows.length;
+    if (remaining <= 1) {
+      card.remove();
+    } else {
+      rows.forEach(row => row.remove());
+    }
   }
 }
-function closePrev() { document.getElementById('prev-modal').classList.remove('show'); }
+
+function disableFileRow(path) {
+  const row = findRow(path);
+  if (row) {
+    row.style.opacity = '0.4';
+    row.style.pointerEvents = 'none';
+    const cb = row.querySelector('input[type=checkbox]');
+    if (cb) { cb.checked = false; cb.disabled = true; }
+  }
+}
 
 // ── Diff ───────────────────────────────────────────────────────────────────────
 
@@ -612,12 +600,65 @@ function buildPane(ops, side) {
   return `<table class="dt"><tbody>${rows}</tbody></table>`;
 }
 
-async function openDiff() {
-  const paths = getChecked();
-  if (paths.length !== 2) return;
-  const [pa, pb] = paths;
+let DIFF_CONTEXT = null; // {files: [{path, rel, size}, ...]}
+
+function buildActionRow(path, fi) {
+  const folderOpts = FOLDERS.map(fo =>
+    '<option value="' + esc(fo) + '">' + esc(fo) + '</option>'
+  ).join('');
+  return '<div class="diff-action-row" data-side="' + fi + '">' +
+    '<input type="checkbox" id="diff-del-' + fi + '" class="diff-del-cb">' +
+    '<label for="diff-del-' + fi + '" class="diff-del-label">L\u00f6schen</label>' +
+    '<span class="diff-path-display" title="' + esc(path) + '">' + esc(path) + '</span>' +
+    '<select class="diff-folder-sel" data-side="' + fi + '" onchange="updateDiffPath(' + fi + ')">' +
+      '<option value="">Ordner\u2026</option>' + folderOpts +
+    '</select>' +
+    '<button class="diff-move-btn" onclick="toggleDiffFolderSel(' + fi + ')" title="Verschieben nach\u2026">&#128193;</button>' +
+  '</div>';
+}
+
+function toggleDiffFolderSel(fi) {
+  const row = document.querySelector('.diff-action-row[data-side="' + fi + '"]');
+  const sel = row.querySelector('.diff-folder-sel');
+  sel.classList.toggle('show');
+  if (sel.classList.contains('show')) sel.focus();
+}
+
+function updateDiffPath(fi) {
+  const row = document.querySelector('.diff-action-row[data-side="' + fi + '"]');
+  const sel = row.querySelector('.diff-folder-sel');
+  const disp = row.querySelector('.diff-path-display');
+  const origFile = DIFF_CONTEXT.files[fi];
+  if (sel.value) {
+    const filename = origFile.path.split('/').pop();
+    const newPath = DATA.root + '/' + sel.value + '/' + filename;
+    disp.textContent = newPath;
+    disp.title = newPath;
+  } else {
+    disp.textContent = origFile.path;
+    disp.title = origFile.path;
+  }
+}
+
+async function openDiff(pa, pb) {
+  // Wenn ohne Argumente aufgerufen (Toolbar-Button): aus Checkboxen lesen
+  if (!pa || !pb) {
+    const paths = getChecked();
+    if (paths.length !== 2) return;
+    pa = paths[0];
+    pb = paths[1];
+  }
+
+  // Datei-Infos aus DATA suchen
+  const fileA = findFileInfo(pa);
+  const fileB = findFileInfo(pb);
+  DIFF_CONTEXT = { files: [
+    { path: pa, rel: fileA ? fileA.rel : pa.split('/').pop(), size: fileA ? fileA.size : '' },
+    { path: pb, rel: fileB ? fileB.rel : pb.split('/').pop(), size: fileB ? fileB.size : '' }
+  ]};
 
   document.getElementById('diff-title').textContent = 'Lade \u2026';
+  document.getElementById('diff-status').textContent = '';
   document.getElementById('diff-grid').innerHTML =
     '<div style="padding:24px;color:var(--muted);grid-column:1/-1">Lade Dateien \u2026</div>';
   document.getElementById('diff-modal').classList.add('show');
@@ -638,15 +679,15 @@ async function openDiff() {
     const ops = diffLines(lA, lB);
 
     const grid = document.getElementById('diff-grid');
-    grid.innerHTML = `
-      <div class="diff-pane" id="dp-a">
-        <div class="diff-pane-hdr" title="${esc(pa)}"><b>A</b> &mdash; ${esc(pa)}</div>
-        ${buildPane(ops,'a')}
-      </div>
-      <div class="diff-pane" id="dp-b">
-        <div class="diff-pane-hdr" title="${esc(pb)}"><b>B</b> &mdash; ${esc(pb)}</div>
-        ${buildPane(ops,'b')}
-      </div>`;
+    grid.innerHTML =
+      '<div class="diff-pane" id="dp-a">' +
+        buildActionRow(pa, 0) +
+        buildPane(ops,'a') +
+      '</div>' +
+      '<div class="diff-pane" id="dp-b">' +
+        buildActionRow(pb, 1) +
+        buildPane(ops,'b') +
+      '</div>';
 
     // Synchrones Scrollen beider Panes
     const pA = document.getElementById('dp-a');
@@ -657,10 +698,94 @@ async function openDiff() {
 
   } catch(e) {
     document.getElementById('diff-grid').innerHTML =
-      `<div style="padding:24px;color:var(--danger);grid-column:1/-1">Fehler: ${esc(String(e))}</div>`;
+      '<div style="padding:24px;color:var(--danger);grid-column:1/-1">Fehler: ' + esc(String(e)) + '</div>';
   }
 }
-function closeDiff() { document.getElementById('diff-modal').classList.remove('show'); }
+
+function closeDiff() {
+  document.getElementById('diff-modal').classList.remove('show');
+  DIFF_CONTEXT = null;
+}
+
+function findFileInfo(path) {
+  if (!DATA) return null;
+  for (const g of DATA.exact)
+    for (const f of g.files)
+      if (f.path === path) return f;
+  for (const p of DATA.similar) {
+    if (p.a.path === path) return p.a;
+    if (p.b.path === path) return p.b;
+  }
+  return null;
+}
+
+// ── \u00c4nderungen anwenden (Diff-Modal) ────────────────────────────────────────────
+async function applyDiffChanges() {
+  if (!DIFF_CONTEXT) return;
+  const status = document.getElementById('diff-status');
+  const toDelete = [];
+  const toMove = [];
+
+  DIFF_CONTEXT.files.forEach((f, fi) => {
+    const row = document.querySelector('.diff-action-row[data-side="' + fi + '"]');
+    const delCb = row.querySelector('.diff-del-cb');
+    const moveSel = row.querySelector('.diff-folder-sel');
+    if (delCb.checked) {
+      toDelete.push(f.path);
+    } else if (moveSel.value) {
+      toMove.push({ path: f.path, dest: DATA.root + '/' + moveSel.value });
+    }
+  });
+
+  if (toDelete.length === 0 && toMove.length === 0) {
+    status.textContent = 'Keine \u00c4nderungen ausgew\u00e4hlt.';
+    return;
+  }
+
+  status.textContent = 'Wird ausgef\u00fchrt\u2026';
+  const messages = [];
+
+  // 1. L\u00f6schen
+  if (toDelete.length > 0) {
+    try {
+      const r = await fetch('/delete', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ paths: toDelete })
+      });
+      const res = await r.json();
+      removeFileRows(toDelete);
+      messages.push(res.failed > 0
+        ? res.deleted + ' gel\u00f6scht, ' + res.failed + ' Fehler'
+        : res.deleted + ' gel\u00f6scht');
+    } catch(e) {
+      messages.push('L\u00f6schen fehlgeschlagen: ' + e);
+    }
+  }
+
+  // 2. Verschieben
+  for (const m of toMove) {
+    try {
+      const r = await fetch('/move', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ path: m.path, dest: m.dest })
+      });
+      const res = await r.json();
+      if (res.ok) {
+        disableFileRow(m.path);
+        const destName = res.dest.split('/').pop();
+        messages.push('\u2713 Verschoben: ' + destName);
+      } else {
+        messages.push('\u2717 ' + res.error);
+      }
+    } catch(e) {
+      messages.push('\u2717 ' + e);
+    }
+  }
+
+  updateBadges();
+  updateBar();
+  closeDiff();
+}
 
 // ── Loeschen ───────────────────────────────────────────────────────────────────
 function confDel() {
@@ -709,32 +834,7 @@ async function doDelete() {
   });
   const res = await r.json();
 
-  // ── DOM-Bereinigung: Karten und Zeilen anpassen ──────────────────────────────
-  // Schritt 1: Zeilen nach Eltern-Karte gruppieren
-  const cardMap = new Map(); // card-Element -> [file-row Elemente]
-  for (const path of paths) {
-    const row  = findRow(path);
-    if (!row) continue;
-    const card = row.closest('.card');
-    if (!card) continue;
-    if (!cardMap.has(card)) cardMap.set(card, []);
-    cardMap.get(card).push(row);
-  }
-
-  // Schritt 2: Pro Karte entscheiden ob Block oder nur Zeile entfernt wird
-  for (const [card, rows] of cardMap) {
-    const totalRows = card.querySelectorAll('.file-row').length;
-    const remaining = totalRows - rows.length;
-    if (remaining <= 1) {
-      // Nur 0 oder 1 Datei uebrig -> ganzen Block entfernen
-      card.remove();
-    } else {
-      // 2+ Dateien uebrig -> nur die geloeschten Zeilen entfernen
-      rows.forEach(row => row.remove());
-    }
-  }
-
-  // Schritt 3: Badges und Leer-Zustand aktualisieren
+  removeFileRows(paths);
   updateBadges();
 
   const msg = res.failed > 0
@@ -752,72 +852,12 @@ async function loadFolders() {
     const r = await fetch('/folders');
     FOLDERS = await r.json();
   } catch(e) { FOLDERS = []; }
-  // Alle move-selects befuellen
-  for (const sel of document.querySelectorAll('.move-sel')) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Verschieben nach\u2026</option>'
-      + FOLDERS.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
-    sel.value = cur;
-  }
-}
-
-function toggleMoveBtn(mid) {
-  const row = document.getElementById(mid);
-  const sel = row.querySelector('.move-sel');
-  const btn = row.querySelector('.btn-move');
-  btn.disabled = !sel.value;
-}
-
-async function doMove(mid) {
-  const row    = document.getElementById(mid);
-  const sel    = row.querySelector('.move-sel');
-  const btn    = row.querySelector('.btn-move');
-  const status = row.querySelector('.move-status');
-  const srcPath = sel.dataset.path;
-  const destRel = sel.value;
-  if (!destRel) return;
-
-  btn.disabled = true;
-  status.className = 'move-status';
-  status.textContent = 'Verschiebe\u2026';
-
-  try {
-    const dest = DATA.root + '/' + destRel;
-    const r = await fetch('/move', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({path: srcPath, dest: dest})
-    });
-    const res = await r.json();
-    if (res.ok) {
-      status.className = 'move-status move-ok';
-      const destName = res.dest.split('/').pop();
-      status.textContent = '\u2713 ' + destRel + '/' + destName;
-      // file-row deaktivieren
-      const fileRow = row.previousElementSibling;
-      if (fileRow) {
-        fileRow.style.opacity = '0.4';
-        fileRow.style.pointerEvents = 'none';
-        const cb = fileRow.querySelector('input[type=checkbox]');
-        if (cb) { cb.checked = false; cb.disabled = true; }
-      }
-      sel.disabled = true;
-    } else {
-      status.className = 'move-status move-err';
-      status.textContent = '\u2717 ' + res.error;
-      btn.disabled = false;
-    }
-  } catch(e) {
-    status.className = 'move-status move-err';
-    status.textContent = '\u2717 ' + e;
-    btn.disabled = false;
-  }
-  updateBar();
 }
 
 // Escape schliesst Modals
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  closeDiff(); closePrev(); closeConf();
+  closeDiff(); closeConf();
 });
 
 load();
@@ -855,6 +895,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 body = json.dumps({"error": str(e)}).encode()
                 self._send(500, "application/json", body)
+
+        elif parsed.path == "/folders":
+            folders = sorted(
+                str(d.relative_to(self.root))
+                for d in self.root.rglob("*")
+                if d.is_dir() and not any(s in d.parts for s in SKIP_DIRS)
+            )
+            self._send(200, "application/json",
+                       json.dumps(folders).encode())
 
         else:
             self._send(404, "text/plain", b"Not found")
@@ -899,15 +948,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, "application/json",
                            json.dumps({"ok": False, "error": str(e)}).encode())
-
-        elif self.path == "/folders":
-            folders = sorted(
-                str(d.relative_to(self.root))
-                for d in self.root.rglob("*")
-                if d.is_dir() and not any(s in d.parts for s in SKIP_DIRS)
-            )
-            self._send(200, "application/json",
-                       json.dumps(folders).encode())
 
         else:
             self._send(404, "text/plain", b"Not found")
