@@ -28,6 +28,8 @@ import itertools
 import json
 import math
 import multiprocessing as mp
+import random
+import shutil
 import sys
 import threading
 import urllib.parse
@@ -39,6 +41,7 @@ from pathlib import Path
 TEXT_EXTENSIONS  = {".md", ".txt", ".markdown", ".rst", ".org"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
 SKIP_DIRS        = {".git", ".obsidian", "node_modules", "__pycache__", ".trash"}
+MAX_COMPARE_CHARS = 10_000  # Textvergleich auf erste 10k Zeichen begrenzen
 
 # ── Hilfs-Funktionen ───────────────────────────────────────────────────────────
 
@@ -72,9 +75,12 @@ def compare_pair(args: tuple):
     if _size_ratio(a, b) < size_ratio_min:
         return None
     try:
-        ta = a.read_text(encoding="utf-8", errors="ignore")
-        tb = b.read_text(encoding="utf-8", errors="ignore")
-        sim = SequenceMatcher(None, ta, tb).ratio() * 100
+        ta = a.read_text(encoding="utf-8", errors="ignore")[:MAX_COMPARE_CHARS]
+        tb = b.read_text(encoding="utf-8", errors="ignore")[:MAX_COMPARE_CHARS]
+        sm = SequenceMatcher(None, ta, tb)
+        if sm.quick_ratio() * 100 < threshold:
+            return None
+        sim = sm.ratio() * 100
     except Exception:
         return None
     return (pa_str, pb_str, round(sim, 1)) if sim >= threshold else None
@@ -101,9 +107,12 @@ def find_duplicates(root: Path, threshold: float, include_images: bool):
     files = collect_files(root)
     print(f"  {len(files)} Dateien gefunden ...", flush=True)
 
+    workers = max(1, mp.cpu_count() - 1)
+
     hash_map: dict = {}
-    for p in files:
-        hash_map.setdefault(file_hash(p), []).append(p)
+    with mp.Pool(processes=workers) as pool:
+        for h, p in zip(pool.map(file_hash, files), files):
+            hash_map.setdefault(h, []).append(p)
     exact_groups = [v for v in hash_map.values() if len(v) > 1]
     exact_paths  = {p for g in exact_groups for p in g}
 
@@ -121,15 +130,40 @@ def find_duplicates(root: Path, threshold: float, include_images: bool):
 
     text_ext  = TEXT_EXTENSIONS
     image_ext = IMAGE_EXTENSIONS
-    pair_args = [
-        (str(a), str(b), threshold, size_ratio_min)
-        for a, b in itertools.combinations(candidates, 2)
-        if (a.suffix.lower() in text_ext  and b.suffix.lower() in text_ext)
-        or (a.suffix.lower() in image_ext and b.suffix.lower() in image_ext)
-    ]
 
-    workers    = max(1, mp.cpu_count() - 1)
-    chunk_size = max(1, math.ceil(max(1, len(pair_args)) / (workers * 8)))
+    # Groessen-Buckets: Nur Dateien mit kompatiblem Groessenverhaeltnis paaren
+    def _size_bucket_pairs(cands, ext_set):
+        """Paare nur aus Dateien bilden, deren Groesse kompatibel ist."""
+        sized = []
+        for p in cands:
+            if p.suffix.lower() in ext_set:
+                try:
+                    sized.append((p.stat().st_size, p))
+                except OSError:
+                    continue
+        sized.sort(key=lambda x: x[0])
+        pairs = []
+        for i, (sa, a) in enumerate(sized):
+            for j in range(i + 1, len(sized)):
+                sb, b = sized[j]
+                if sa == 0 and sb == 0:
+                    pairs.append((str(a), str(b), threshold, size_ratio_min))
+                    continue
+                if sa == 0 or sb == 0:
+                    break
+                if sa / sb < size_ratio_min:
+                    break
+                pairs.append((str(a), str(b), threshold, size_ratio_min))
+        return pairs
+
+    pair_args = _size_bucket_pairs(candidates, text_ext) + \
+                _size_bucket_pairs(candidates, image_ext)
+    skipped = total_pairs - len(pair_args)
+    if skipped > 0:
+        print(f"  {skipped:,} Paare durch Groessen-Vorfilter uebersprungen", flush=True)
+    # Mischen damit langsame Paare (grosse Dateien) gleichmaessig verteilt werden
+    random.shuffle(pair_args)
+    chunk_size = max(1, min(50, math.ceil(max(1, len(pair_args)) / (workers * 8))))
     print(f"  Starte {workers} Worker-Prozesse ...", flush=True)
 
     similar_pairs = []
@@ -250,6 +284,18 @@ button:disabled{opacity:.33;cursor:not-allowed}
 .all-sel{display:flex;gap:8px;font-size:12px;color:var(--muted)}
 .all-sel a{color:var(--accent);cursor:pointer;text-decoration:none}
 .empty{padding:36px;text-align:center;color:var(--muted)}
+
+/* Move row */
+.move-row{padding:6px 14px 8px 38px;display:flex;align-items:center;gap:8px;
+          border-bottom:1px solid var(--border);background:rgba(108,143,255,.04)}
+.move-row select{background:var(--surface2);color:var(--text);border:1px solid var(--border);
+                  border-radius:5px;padding:4px 8px;font-family:var(--font);font-size:12px;
+                  flex:1;max-width:420px}
+.btn-move{background:var(--accent);color:#000;padding:4px 12px;border-radius:5px;
+          border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600}
+.btn-move:disabled{opacity:.33;cursor:not-allowed}
+.move-ok{color:var(--ok);font-size:11px}
+.move-err{color:var(--danger);font-size:11px}
 
 /* Overlays */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);
@@ -393,6 +439,7 @@ async function load() {
   document.getElementById('root-label').textContent = DATA.root;
   renderExact(DATA.exact);
   renderSimilar(DATA.similar);
+  await loadFolders();
 }
 
 // ── Escape ─────────────────────────────────────────────────────────────────────
@@ -409,11 +456,19 @@ function simColor(p) {
 // ── Datei-Zeile ────────────────────────────────────────────────────────────────
 function fileRow(f, id) {
   const ph = JSON.stringify(f.path), rh = JSON.stringify(f.rel);
+  const mid = 'mv-' + id;
   return `<div class="file-row">
     <input type="checkbox" id="${id}" data-path="${esc(f.path)}" onchange="updateBar()">
     <label for="${id}" class="file-path">${esc(f.rel)}</label>
     <span class="file-meta">${f.size}</span>
     <button class="btn-eye" onclick="openPrev(${ph},${rh})" title="Vorschau">&#128065;</button>
+  </div>
+  <div class="move-row" id="${mid}">
+    <select class="move-sel" data-path="${esc(f.path)}" onchange="toggleMoveBtn('${mid}')">
+      <option value="">Verschieben nach\u2026</option>
+    </select>
+    <button class="btn-move" disabled onclick="doMove('${mid}')" title="Datei verschieben">Verschieben</button>
+    <span class="move-status"></span>
   </div>`;
 }
 
@@ -689,6 +744,76 @@ async function doDelete() {
   updateBar();
 }
 
+// ── Verschieben ────────────────────────────────────────────────────────────────
+let FOLDERS = [];
+
+async function loadFolders() {
+  try {
+    const r = await fetch('/folders');
+    FOLDERS = await r.json();
+  } catch(e) { FOLDERS = []; }
+  // Alle move-selects befuellen
+  for (const sel of document.querySelectorAll('.move-sel')) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Verschieben nach\u2026</option>'
+      + FOLDERS.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+    sel.value = cur;
+  }
+}
+
+function toggleMoveBtn(mid) {
+  const row = document.getElementById(mid);
+  const sel = row.querySelector('.move-sel');
+  const btn = row.querySelector('.btn-move');
+  btn.disabled = !sel.value;
+}
+
+async function doMove(mid) {
+  const row    = document.getElementById(mid);
+  const sel    = row.querySelector('.move-sel');
+  const btn    = row.querySelector('.btn-move');
+  const status = row.querySelector('.move-status');
+  const srcPath = sel.dataset.path;
+  const destRel = sel.value;
+  if (!destRel) return;
+
+  btn.disabled = true;
+  status.className = 'move-status';
+  status.textContent = 'Verschiebe\u2026';
+
+  try {
+    const dest = DATA.root + '/' + destRel;
+    const r = await fetch('/move', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({path: srcPath, dest: dest})
+    });
+    const res = await r.json();
+    if (res.ok) {
+      status.className = 'move-status move-ok';
+      const destName = res.dest.split('/').pop();
+      status.textContent = '\u2713 ' + destRel + '/' + destName;
+      // file-row deaktivieren
+      const fileRow = row.previousElementSibling;
+      if (fileRow) {
+        fileRow.style.opacity = '0.4';
+        fileRow.style.pointerEvents = 'none';
+        const cb = fileRow.querySelector('input[type=checkbox]');
+        if (cb) { cb.checked = false; cb.disabled = true; }
+      }
+      sel.disabled = true;
+    } else {
+      status.className = 'move-status move-err';
+      status.textContent = '\u2717 ' + res.error;
+      btn.disabled = false;
+    }
+  } catch(e) {
+    status.className = 'move-status move-err';
+    status.textContent = '\u2717 ' + e;
+    btn.disabled = false;
+  }
+  updateBar();
+}
+
 // Escape schliesst Modals
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -748,6 +873,42 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     failed += 1
             self._send(200, "application/json",
                        json.dumps({"deleted": deleted, "failed": failed}).encode())
+
+        elif self.path == "/move":
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length))
+            src    = Path(body.get("path", ""))
+            dest_dir = Path(body.get("dest", ""))
+            try:
+                if not src.is_file():
+                    raise FileNotFoundError(f"Quelldatei nicht gefunden: {src}")
+                if not dest_dir.is_dir():
+                    raise NotADirectoryError(f"Zielordner nicht gefunden: {dest_dir}")
+                # Zieldatei mit Konfliktvermeidung
+                stem    = src.stem
+                suffix  = src.suffix
+                target  = dest_dir / src.name
+                counter = 1
+                while target.exists():
+                    target = dest_dir / f"{stem}-{counter}{suffix}"
+                    counter += 1
+                shutil.move(str(src), str(target))
+                self._send(200, "application/json",
+                           json.dumps({"ok": True,
+                                       "dest": str(target)}).encode())
+            except Exception as e:
+                self._send(500, "application/json",
+                           json.dumps({"ok": False, "error": str(e)}).encode())
+
+        elif self.path == "/folders":
+            folders = sorted(
+                str(d.relative_to(self.root))
+                for d in self.root.rglob("*")
+                if d.is_dir() and not any(s in d.parts for s in SKIP_DIRS)
+            )
+            self._send(200, "application/json",
+                       json.dumps(folders).encode())
+
         else:
             self._send(404, "text/plain", b"Not found")
 
