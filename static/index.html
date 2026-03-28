@@ -3,21 +3,41 @@
 <head>
 <meta charset="utf-8">
 <title>Notes Dedup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+<link rel="stylesheet" href="/static/theme/light.css">
+<link rel="stylesheet" href="/static/theme/dark.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="dark">
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+  <div class="loading-ring"></div>
+  <span class="label-medium" id="loading-text">Scanne Dateien &hellip;</span>
+</div>
 
 <header>
-  <h1>&#x1F4D3; Notes Dedup</h1>
-  <div id="root-label"></div>
+  <div class="header-start"></div>
+  <h1 class="title-large">Notes Dedup</h1>
+  <div class="header-end">
+    <div id="root-label" class="body-small"></div>
+    <button class="btn-icon" id="btn-theme" onclick="toggleTheme()" title="Theme wechseln">
+      <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+    </button>
+  </div>
 </header>
 
 <div class="tabs">
   <div class="tab active" id="tab-exact" onclick="switchTab('exact')">
-    Exakte Kopien <span class="badge" id="cnt-exact">0</span>
+    <span class="label-large">Exakte Kopien</span>
+    <span class="badge" id="cnt-exact">0</span>
   </div>
   <div class="tab" id="tab-similar" onclick="switchTab('similar')">
-    &#228;hnliche Dateien <span class="badge" id="cnt-similar">0</span>
+    <span class="label-large">&#228;hnliche Dateien</span>
+    <span class="badge" id="cnt-similar">0</span>
   </div>
 </div>
 
@@ -26,34 +46,51 @@
 
 <div class="toolbar">
   <div class="all-sel">
-    <a onclick="selAll(true)">Alle</a> /
-    <a onclick="selAll(false)">Keine</a>
+    <a onclick="selAll(true)" class="label-medium">Alle</a> /
+    <a onclick="selAll(false)" class="label-medium">Keine</a>
   </div>
-  <button class="btn-accent"    id="btn-diff"  onclick="openDiff()"     disabled>&#8660; Vergleichen</button>
-  <button class="btn-danger"    id="btn-del"   onclick="confDel()"      disabled>&#128465; L&#246;schen</button>
-  <button class="btn-secondary"               onclick="location.reload()">&#8635; Neu scannen</button>
-  <div id="status">W&#228;hle Dateien aus.</div>
+  <button class="btn-filled" id="btn-diff" onclick="openDiff()" disabled>
+    <span class="material-symbols-outlined">compare</span>
+    Vergleichen
+  </button>
+  <button class="btn-filled-error" id="btn-del" onclick="confDel()" disabled>
+    <span class="material-symbols-outlined">delete</span>
+    L&#246;schen
+  </button>
+  <button class="btn-tonal" onclick="location.reload()">
+    <span class="material-symbols-outlined">refresh</span>
+    Neu scannen
+  </button>
+  <div id="status" class="label-small">W&#228;hle Dateien aus.</div>
 </div>
 
 <!-- Diff / Vergleich -->
 <div class="overlay" id="diff-modal">
   <div class="modal">
     <div class="modal-hdr">
-      <h2 id="diff-title">Vergleich</h2>
-      <button class="btn-x" onclick="closeDiff()">&#10005;</button>
+      <h2 class="title-medium" id="diff-title">Vergleich</h2>
+      <button class="btn-icon" onclick="closeDiff()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
-    <div class="modal-body" style="overflow:hidden;display:flex;flex-direction:column">
-      <div class="diff-grid" id="diff-grid" style="flex:1;min-height:0"></div>
+    <div class="modal-body">
+      <div class="diff-grid" id="diff-grid"></div>
     </div>
     <div class="diff-legend">
-      <span><span class="ld" style="background:var(--del-bg);border:1px solid var(--del-fg)"></span>Nur in A (links)</span>
-      <span><span class="ld" style="background:var(--add-bg);border:1px solid var(--add-fg)"></span>Nur in B (rechts)</span>
-      <span><span class="ld" style="background:var(--surface2);border:1px solid var(--border)"></span>Identisch</span>
+      <span class="label-small"><span class="ld ld-del"></span>Nur in A (links)</span>
+      <span class="label-small"><span class="ld ld-add"></span>Nur in B (rechts)</span>
+      <span class="label-small"><span class="ld ld-eq"></span>Identisch</span>
     </div>
     <div class="modal-footer">
-      <span class="diff-status" id="diff-status"></span>
-      <button class="btn-secondary" id="btn-recompare" onclick="reCompare()" disabled>&#8635; Erneut vergleichen</button>
-      <button class="btn-accent" onclick="applyDiffChanges()">&#10003; &#196;nderungen anwenden</button>
+      <span class="diff-status label-small" id="diff-status"></span>
+      <button class="btn-tonal" id="btn-recompare" onclick="reCompare()" disabled>
+        <span class="material-symbols-outlined">refresh</span>
+        Erneut vergleichen
+      </button>
+      <button class="btn-filled" onclick="applyDiffChanges()">
+        <span class="material-symbols-outlined">check</span>
+        &#196;nderungen anwenden
+      </button>
     </div>
   </div>
 </div>
@@ -61,12 +98,15 @@
 <!-- Bestaetigung -->
 <div id="conf-overlay">
   <div id="conf-box">
-    <h2>&#9888;&#65039; Wirklich l&#246;schen?</h2>
-    <p>Diese <strong id="conf-cnt"></strong> Datei(en) werden <em>unwiderruflich</em> gel&#246;scht:</p>
+    <h2 class="title-medium">
+      <span class="material-symbols-outlined">warning</span>
+      Wirklich l&#246;schen?
+    </h2>
+    <p class="body-medium">Diese <strong id="conf-cnt"></strong> Datei(en) werden <em>unwiderruflich</em> gel&#246;scht:</p>
     <div id="conf-list"></div>
     <div class="conf-btns">
-      <button class="btn-secondary" onclick="closeConf()">Abbrechen</button>
-      <button class="btn-danger"    onclick="doDelete()">Jetzt l&#246;schen</button>
+      <button class="btn-tonal" onclick="closeConf()">Abbrechen</button>
+      <button class="btn-filled-error" onclick="doDelete()">Jetzt l&#246;schen</button>
     </div>
   </div>
 </div>

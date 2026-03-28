@@ -1,13 +1,48 @@
 let DATA = null;
 
+// ── Theme ───────────────────────────────────────────────────────────────────────
+(function initTheme() {
+  const t = localStorage.getItem('theme') || 'dark';
+  document.body.className = t;
+  // Update icon after DOM ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
+  });
+})();
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark');
+  const next = isDark ? 'light' : 'dark';
+  document.body.className = next;
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+  localStorage.setItem('theme', next);
+}
+
+// ── Loading ─────────────────────────────────────────────────────────────────────
+function showLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) { el.classList.remove('hidden'); }
+}
+function hideLoading() {
+  const el = document.getElementById('loading-overlay');
+  if (el) { el.classList.add('hidden'); }
+}
+
 // ── Laden ──────────────────────────────────────────────────────────────────────
 async function load() {
-  const r = await fetch('/data');
-  DATA = await r.json();
-  document.getElementById('root-label').textContent = DATA.root;
-  renderExact(DATA.exact);
-  renderSimilar(DATA.similar);
-  await loadFolders();
+  showLoading();
+  try {
+    const r = await fetch('/data');
+    DATA = await r.json();
+    document.getElementById('root-label').textContent = DATA.root;
+    renderExact(DATA.exact);
+    renderSimilar(DATA.similar);
+    await loadFolders();
+  } finally {
+    hideLoading();
+  }
 }
 
 // ── Escape ─────────────────────────────────────────────────────────────────────
@@ -18,13 +53,32 @@ function esc(s) {
 }
 
 function simColor(p) {
-  return p>=100?'#ff6b6b':p>=95?'#ffa06b':p>=90?'#ffd06b':'#6c8fff';
+  return p >= 100 ? 'sim-high' : p >= 95 ? 'sim-mid-high' : p >= 90 ? 'sim-mid' : 'sim-low';
+}
+
+// ── Datei-Icon nach Endung ──────────────────────────────────────────────────────
+function fileIcon(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  const map = {
+    md: 'description', txt: 'article', pdf: 'picture_as_pdf',
+    js: 'javascript', ts: 'code', py: 'code', sh: 'terminal',
+    html: 'html', css: 'css', json: 'data_object',
+    png: 'image', jpg: 'image', jpeg: 'image', gif: 'image',
+    svg: 'image', webp: 'image',
+    mp3: 'audio_file', wav: 'audio_file',
+    mp4: 'video_file', mov: 'video_file',
+    zip: 'folder_zip', tar: 'folder_zip', gz: 'folder_zip',
+  };
+  return map[ext] || 'insert_drive_file';
 }
 
 // ── Datei-Zeile ────────────────────────────────────────────────────────────────
 function fileRow(f, id) {
   return `<div class="file-row">
-    <input type="checkbox" id="${id}" data-path="${esc(f.path)}" onchange="updateBar()">
+    <div class="checkbox-wrap">
+      <input type="checkbox" id="${id}" data-path="${esc(f.path)}" onchange="updateBar()">
+    </div>
+    <span class="material-symbols-outlined file-icon">${fileIcon(f.path)}</span>
     <label for="${id}" class="file-path">${esc(f.rel)}</label>
     <span class="file-meta">${f.size}</span>
   </div>`;
@@ -36,11 +90,11 @@ function renderExact(groups) {
   if (groups.length) document.getElementById('tab-exact').classList.add('has-items');
   const sec = document.getElementById('sec-exact');
   if (!groups.length) {
-    sec.innerHTML = '<div class="empty">&#9989; Keine exakten Duplikate gefunden.</div>';
+    sec.innerHTML = '<div class="empty"><span class="material-symbols-outlined">check_circle</span> Keine exakten Duplikate gefunden.</div>';
     return;
   }
   sec.innerHTML = groups.map((g,gi) =>
-    `<div class="card">
+    `<div class="card" style="--card-delay:${Math.min(gi, 12) * 35}ms">
        <div class="group-label">Gruppe ${gi+1} &mdash; ${g.files.length} identische Dateien</div>
        ${g.files.map((f,fi)=>fileRow(f,`e-${gi}-${fi}`)).join('')}
      </div>`
@@ -53,18 +107,22 @@ function renderSimilar(pairs) {
   if (pairs.length) document.getElementById('tab-similar').classList.add('has-items');
   const sec = document.getElementById('sec-similar');
   if (!pairs.length) {
-    sec.innerHTML = '<div class="empty">&#9989; Keine &#228;hnlichen Dateien gefunden.</div>';
+    sec.innerHTML = '<div class="empty"><span class="material-symbols-outlined">check_circle</span> Keine &#228;hnlichen Dateien gefunden.</div>';
     return;
   }
   sec.innerHTML = pairs.map((p,i) => {
     const col = simColor(p.similarity);
-    return `<div class="card">
+    return `<div class="card" style="--card-delay:${Math.min(i, 12) * 35}ms">
       <div class="card-header">
-        <span class="badge-sim" style="background:${col};color:#000">${p.similarity}%</span>
-        <span style="flex:1;color:var(--muted);font-size:11px">&#196;hnlichkeit</span>
+        <span class="badge-sim ${col}">${p.similarity}%</span>
+        <span class="sim-label">&#196;hnlichkeit</span>
         <div class="sim-bar">
-          <div class="sim-fill" style="width:${p.similarity}%;background:${col}"></div>
+          <div class="sim-fill ${col}" style="width:${p.similarity}%"></div>
         </div>
+        <button class="btn-quick-compare" title="Direkt vergleichen"
+          onclick="openDiff('${esc(p.a.path)}','${esc(p.b.path)}')">
+          <span class="material-symbols-outlined">compare</span>
+        </button>
       </div>
       ${fileRow(p.a,`s-${i}-a`)}
       ${fileRow(p.b,`s-${i}-b`)}
@@ -200,8 +258,8 @@ function buildActionRow(path, fi) {
     '<select class="diff-folder-sel" data-side="' + fi + '" onchange="updateDiffPath(' + fi + ')">' +
       '<option value="">Ordner\u2026</option>' + folderOpts +
     '</select>' +
-    '<button class="diff-move-btn" onclick="toggleDiffFolderSel(' + fi + ')" title="Verschieben nach\u2026">&#128193;</button>' +
-    '<button class="diff-edit-btn" onclick="toggleEdit(' + fi + ')">&#9998; Bearbeiten</button>' +
+    '<button class="diff-move-btn" onclick="toggleDiffFolderSel(' + fi + ')" title="Verschieben nach\u2026"><span class="material-symbols-outlined">folder_open</span></button>' +
+    '<button class="diff-edit-btn" onclick="toggleEdit(' + fi + ')"><span class="material-symbols-outlined">edit</span> Bearbeiten</button>' +
   '</div>';
 }
 
@@ -269,7 +327,7 @@ function toggleEdit(fi) {
   if (ta) {
     // Textarea -> zurueck (Inhalt ist bereits im Cache)
     EDIT_CACHE[side] = ta.value;
-    btn.innerHTML = '&#9998; Bearbeiten';
+    btn.innerHTML = '<span class="material-symbols-outlined">edit</span> Bearbeiten';
     // Einzelne Pane neu rendern: Diff mit aktuellem Cache
     const textA = EDIT_CACHE.a ?? EDIT_CACHE.originalA;
     const textB = EDIT_CACHE.b ?? EDIT_CACHE.originalB;
@@ -288,7 +346,7 @@ function toggleEdit(fi) {
       updateRecompareBtn();
     });
     table.replaceWith(textarea);
-    btn.innerHTML = '&#9998; Vorschau';
+    btn.innerHTML = '<span class="material-symbols-outlined">preview</span> Vorschau';
     textarea.focus();
     updateRecompareBtn();
   }
@@ -328,7 +386,7 @@ async function openDiff(pa, pb) {
   document.getElementById('diff-title').textContent = 'Lade \u2026';
   document.getElementById('diff-status').textContent = '';
   document.getElementById('diff-grid').innerHTML =
-    '<div style="padding:24px;color:var(--muted);grid-column:1/-1">Lade Dateien \u2026</div>';
+    '<div class="diff-loading">Lade Dateien \u2026</div>';
   document.getElementById('diff-modal').classList.add('show');
 
   try {
@@ -347,7 +405,7 @@ async function openDiff(pa, pb) {
 
   } catch(e) {
     document.getElementById('diff-grid').innerHTML =
-      '<div style="padding:24px;color:var(--danger);grid-column:1/-1">Fehler: ' + esc(String(e)) + '</div>';
+      '<div class="diff-error">Fehler: ' + esc(String(e)) + '</div>';
   }
 }
 
@@ -493,7 +551,7 @@ function updateBadges() {
     cnt.textContent = cards.length;
     tab.classList.toggle('has-items', cards.length > 0);
     if (cards.length === 0 && !sec.querySelector('.empty')) {
-      sec.innerHTML = '<div class="empty">&#9989; Keine Eintr\u00e4ge mehr vorhanden.</div>';
+      sec.innerHTML = '<div class="empty"><span class="material-symbols-outlined">check_circle</span> Keine Eintr\u00e4ge mehr vorhanden.</div>';
     }
   }
 }

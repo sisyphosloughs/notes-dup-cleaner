@@ -48,4 +48,12 @@
   --md-sys-color-surface-container: rgb(235 237 248);
   --md-sys-color-surface-container-high: rgb(230 232 242);
   --md-sys-color-surface-container-highest: rgb(224 226 236);
+  /* Diff-spezifische Farben (links=grün, rechts=rot) */
+  --md-custom-color-diff-green-container: rgb(198 239 216);
+  --md-custom-color-on-diff-green-container: rgb(0 64 26);
+  /* Direkte Diff-Alias-Farben (umgehen die :root-Variablenkette) */
+  --color-diff-del-bg: rgb(198 239 216);
+  --color-diff-del-fg: rgb(0 64 26);
+  --color-diff-add-bg: rgb(255 218 214);
+  --color-diff-add-fg: rgb(147 0 10);
 }
