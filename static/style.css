@@ -14,10 +14,6 @@
   --color-on-error:       var(--md-sys-color-on-error);
   --color-on-surface:     var(--md-sys-color-on-surface);
   --color-on-surface-var: var(--md-sys-color-on-surface-variant);
-  --color-diff-del-bg:    var(--md-custom-color-diff-green-container);
-  --color-diff-del-fg:    var(--md-custom-color-on-diff-green-container);
-  --color-diff-add-bg:    var(--md-sys-color-error-container);
-  --color-diff-add-fg:    var(--md-sys-color-on-error-container);
   --color-scrim:          var(--md-sys-color-scrim);
   --font-ui:   'Noto Sans', system-ui, -apple-system, sans-serif;
   --font-code: ui-monospace, 'SFMono-Regular', 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
@@ -275,11 +271,6 @@ section.active { display: block; }
 .sim-mid-high { background: var(--md-sys-color-primary-fixed-dim); color: var(--md-sys-color-on-primary-fixed-variant); }
 .sim-mid      { background: var(--md-sys-color-primary-fixed);     color: var(--md-sys-color-on-primary-fixed); }
 .sim-low      { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
-.sim-fill.sim-high     { background: var(--md-sys-color-primary); }
-.sim-fill.sim-mid-high { background: var(--md-sys-color-primary-fixed-dim); }
-.sim-fill.sim-mid      { background: var(--md-sys-color-primary-fixed); }
-.sim-fill.sim-low      { background: var(--md-sys-color-surface-container-highest); }
-
 /* ── Checkbox (M3) ──────────────────────────────────────────────────────────── */
 .checkbox-wrap {
   position: relative;

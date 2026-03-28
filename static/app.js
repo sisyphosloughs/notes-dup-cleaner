@@ -1,23 +1,21 @@
 let DATA = null;
 
 // ── Theme ───────────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.body.className = theme;
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
+  localStorage.setItem('theme', theme);
+}
+
 (function initTheme() {
   const t = localStorage.getItem('theme') || 'dark';
   document.body.className = t;
-  // Update icon after DOM ready
-  document.addEventListener('DOMContentLoaded', function() {
-    const icon = document.getElementById('theme-icon');
-    if (icon) icon.textContent = t === 'dark' ? 'light_mode' : 'dark_mode';
-  });
+  document.addEventListener('DOMContentLoaded', function() { applyTheme(t); });
 })();
 
 function toggleTheme() {
-  const isDark = document.body.classList.contains('dark');
-  const next = isDark ? 'light' : 'dark';
-  document.body.className = next;
-  const icon = document.getElementById('theme-icon');
-  if (icon) icon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
-  localStorage.setItem('theme', next);
+  applyTheme(document.body.classList.contains('dark') ? 'light' : 'dark');
 }
 
 // ── Loading ─────────────────────────────────────────────────────────────────────
@@ -57,19 +55,19 @@ function simColor(p) {
 }
 
 // ── Datei-Icon nach Endung ──────────────────────────────────────────────────────
+const FILE_ICON_MAP = {
+  md: 'description', txt: 'article', pdf: 'picture_as_pdf',
+  js: 'javascript', ts: 'code', py: 'code', sh: 'terminal',
+  html: 'html', css: 'css', json: 'data_object',
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image',
+  svg: 'image', webp: 'image',
+  mp3: 'audio_file', wav: 'audio_file',
+  mp4: 'video_file', mov: 'video_file',
+  zip: 'folder_zip', tar: 'folder_zip', gz: 'folder_zip',
+};
 function fileIcon(path) {
   const ext = (path.split('.').pop() || '').toLowerCase();
-  const map = {
-    md: 'description', txt: 'article', pdf: 'picture_as_pdf',
-    js: 'javascript', ts: 'code', py: 'code', sh: 'terminal',
-    html: 'html', css: 'css', json: 'data_object',
-    png: 'image', jpg: 'image', jpeg: 'image', gif: 'image',
-    svg: 'image', webp: 'image',
-    mp3: 'audio_file', wav: 'audio_file',
-    mp4: 'video_file', mov: 'video_file',
-    zip: 'folder_zip', tar: 'folder_zip', gz: 'folder_zip',
-  };
-  return map[ext] || 'insert_drive_file';
+  return FILE_ICON_MAP[ext] || 'insert_drive_file';
 }
 
 // ── Datei-Zeile ────────────────────────────────────────────────────────────────
