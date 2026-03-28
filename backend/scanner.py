@@ -145,7 +145,7 @@ def find_duplicates(root: Path, threshold: float, include_images: bool):
                       f"{len(similar_pairs)} Treffer)", end="\r", flush=True)
 
     print(f"\n  Fertig: {len(exact_groups)} exakte Gruppen, "
-          f"{len(similar_pairs)} aehnliche Paare.        ", flush=True)
+          f"{len(similar_pairs)} Aehnliche Paare.        ", flush=True)
     return exact_groups, similar_pairs
 
 

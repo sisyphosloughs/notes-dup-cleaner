@@ -145,12 +145,9 @@ function getChecked() {
 
 function updateBar() {
   const paths = getChecked(), n = paths.length;
+  document.getElementById('btn-deselect').disabled = n === 0;
   document.getElementById('btn-del').disabled  = n === 0;
   document.getElementById('btn-diff').disabled = n !== 2;
-  document.getElementById('status').textContent =
-    n === 0 ? 'W\u00e4hle Dateien aus.' :
-    n === 2 ? `2 ausgew\u00e4hlt \u2014 \u201eVergleichen\u201c verf\u00fcgbar` :
-              `${n} Datei(en) ausgew\u00e4hlt`;
 }
 
 function selAll(v) {
@@ -557,7 +554,6 @@ function updateBadges() {
 async function doDelete() {
   closeConf();
   const paths = getChecked();
-  document.getElementById('status').textContent = 'L\u00f6sche \u2026';
 
   const r = await fetch('/delete', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -571,7 +567,6 @@ async function doDelete() {
   const msg = res.failed > 0
     ? `\u26a0\ufe0f ${res.deleted} gel\u00f6scht, ${res.failed} Fehler`
     : `\u2705 ${res.deleted} gel\u00f6scht`;
-  document.getElementById('status').textContent = msg;
   updateBar();
 }
 

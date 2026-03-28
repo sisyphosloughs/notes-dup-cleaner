@@ -94,10 +94,7 @@ header h1 {
 }
 #root-label {
   color: var(--color-on-surface-var);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 240px;
+  font-weight: 400;
 }
 
 /* ── Tabs (M3: Primary Tab Bar) ─────────────────────────────────────────────── */
@@ -346,24 +343,6 @@ section.active { display: block; }
   gap: 8px;
   flex-wrap: wrap;
 }
-#status {
-  color: var(--color-on-surface-var);
-  margin-left: auto;
-}
-.all-sel {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-on-surface-var);
-}
-.all-sel a {
-  color: var(--color-primary);
-  cursor: pointer;
-  text-decoration: none;
-}
-.all-sel a:hover { text-decoration: underline; }
-
 /* ── Buttons (M3: Filled, Tonal, Icon) ──────────────────────────────────────── */
 button {
   position: relative;

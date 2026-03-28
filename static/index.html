@@ -21,9 +21,8 @@
 
 <header>
   <div class="header-start"></div>
-  <h1 class="title-large">Notes Dedup</h1>
+  <h1 class="title-large">Notes Dedup: <span id="root-label"></span></h1>
   <div class="header-end">
-    <div id="root-label" class="body-small"></div>
     <button class="btn-icon" id="btn-theme" onclick="toggleTheme()" title="Theme wechseln">
       <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
     </button>
@@ -36,7 +35,7 @@
     <span class="badge" id="cnt-exact">0</span>
   </div>
   <div class="tab" id="tab-similar" onclick="switchTab('similar')">
-    <span class="label-large">&#228;hnliche Dateien</span>
+    <span class="label-large">&#196;hnliche Dateien</span>
     <span class="badge" id="cnt-similar">0</span>
   </div>
 </div>
@@ -45,10 +44,10 @@
 <section id="sec-similar"></section>
 
 <div class="toolbar">
-  <div class="all-sel">
-    <a onclick="selAll(true)" class="label-medium">Alle</a> /
-    <a onclick="selAll(false)" class="label-medium">Keine</a>
-  </div>
+  <button class="btn-tonal" id="btn-deselect" onclick="selAll(false)" disabled>
+    <span class="material-symbols-outlined">deselect</span>
+    Nichts ausw&#228;hlen
+  </button>
   <button class="btn-filled" id="btn-diff" onclick="openDiff()" disabled>
     <span class="material-symbols-outlined">compare</span>
     Vergleichen
@@ -61,7 +60,6 @@
     <span class="material-symbols-outlined">refresh</span>
     Neu scannen
   </button>
-  <div id="status" class="label-small">W&#228;hle Dateien aus.</div>
 </div>
 
 <!-- Diff / Vergleich -->
