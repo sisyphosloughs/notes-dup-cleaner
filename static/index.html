@@ -38,10 +38,15 @@
     <span class="label-large">&#196;hnliche Dateien</span>
     <span class="badge" id="cnt-similar">0</span>
   </div>
+  <div class="tab" id="tab-stats" onclick="switchTab('stats')">
+    <span class="label-large">Ordner</span>
+    <span class="badge" id="cnt-stats">0</span>
+  </div>
 </div>
 
 <section id="sec-exact"  class="active"></section>
 <section id="sec-similar"></section>
+<section id="sec-stats"></section>
 
 <div class="toolbar">
   <button class="btn-tonal" id="btn-deselect" onclick="selAll(false)" disabled>

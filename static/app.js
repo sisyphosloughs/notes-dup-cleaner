@@ -37,6 +37,7 @@ async function load() {
     document.getElementById('root-label').textContent = DATA.root;
     renderExact(DATA.exact);
     renderSimilar(DATA.similar);
+    renderStats(DATA.stats);
     await loadFolders();
   } finally {
     hideLoading();
@@ -128,12 +129,92 @@ function renderSimilar(pairs) {
   }).join('');
 }
 
+// ── Ordner-Tab: Tree + Tabelle ────────────────────────────────────────────────
+function buildFolderTree(stats) {
+  const root = { name: '', children: {}, count: 0 };
+  for (const s of stats) {
+    if (s.folder === '.') {
+      root.count = s.count;
+    } else {
+      let node = root;
+      for (const part of s.folder.split('/')) {
+        if (!node.children[part])
+          node.children[part] = { name: part, children: {}, count: 0 };
+        node = node.children[part];
+      }
+      node.count = s.count;
+    }
+  }
+  return root;
+}
+
+function treeToLines(node, prefix) {
+  const keys = Object.keys(node.children).sort();
+  const lines = [];
+  keys.forEach((key, idx) => {
+    const child = node.children[key];
+    const isLast = idx === keys.length - 1;
+    const conn = isLast ? '└── ' : '├── ';
+    const cont = isLast ? '    ' : '│   ';
+    const cnt  = child.count > 0
+      ? `<span class="tree-count"> (${child.count})</span>`
+      : '';
+    lines.push(
+      `<span class="tree-chrome">${esc(prefix + conn)}</span>` +
+      `<span class="tree-dir">${esc(child.name)}/</span>${cnt}`
+    );
+    lines.push(...treeToLines(child, prefix + cont));
+  });
+  return lines;
+}
+
+function renderStats(stats) {
+  stats = stats || [];
+  document.getElementById('cnt-stats').textContent = stats.length;
+  const sec = document.getElementById('sec-stats');
+  if (!stats.length) {
+    sec.innerHTML = '<div class="empty"><span class="material-symbols-outlined">folder_off</span> Keine Dateien gefunden.</div>';
+    return;
+  }
+
+  const tree = buildFolderTree(stats);
+  const rootCnt = tree.count > 0
+    ? `<span class="tree-count"> (${tree.count})</span>`
+    : '';
+  const treeLines = [
+    `<span class="tree-root">/ (Stamm)</span>${rootCnt}`,
+    ...treeToLines(tree, '')
+  ].map(l => `<div>${l}</div>`).join('');
+
+  const rows = stats.map(s => {
+    const name = s.folder === '.' ? '/ (Stamm)' : esc(s.folder);
+    return `<tr>
+      <td class="stats-folder">${name}</td>
+      <td class="stats-count">${s.count}</td>
+    </tr>`;
+  }).join('');
+
+  sec.innerHTML =
+    `<div class="tree-view">${treeLines}</div>
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th class="label-large stats-folder">Ordner</th>
+          <th class="label-large stats-count">Anzahl Dateien</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 function switchTab(n) {
-  ['exact','similar'].forEach(k => {
+  ['exact','similar','stats'].forEach(k => {
     document.getElementById('tab-'+k).classList.toggle('active', k===n);
     document.getElementById('sec-'+k).classList.toggle('active', k===n);
   });
+  const toolbar = document.querySelector('.toolbar');
+  if (toolbar) toolbar.classList.toggle('hidden', n === 'stats');
   updateBar();
 }
 

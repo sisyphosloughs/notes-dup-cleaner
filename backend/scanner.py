@@ -7,6 +7,7 @@ from pathlib import Path
 
 TEXT_EXTENSIONS  = {".md", ".txt", ".markdown", ".rst", ".org"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
+CONTENT_EXTENSIONS = TEXT_EXTENSIONS | IMAGE_EXTENSIONS
 SKIP_DIRS        = {".git", ".obsidian", "node_modules", "__pycache__", ".trash"}
 MAX_COMPARE_CHARS = 10_000
 
@@ -149,6 +150,23 @@ def find_duplicates(root: Path, threshold: float, include_images: bool):
     return exact_groups, similar_pairs
 
 
+def folder_stats(root: Path, files: list) -> list:
+    """Zaehlt Text- und Bild-Dateien direkt pro Ordner (ohne Unterordner)."""
+    counts: dict = {}
+    for p in files:
+        if p.suffix.lower() in CONTENT_EXTENSIONS:
+            counts[p.parent] = counts.get(p.parent, 0) + 1
+    stats = []
+    for folder, n in counts.items():
+        try:
+            rel = str(folder.relative_to(root))
+        except ValueError:
+            rel = str(folder)
+        stats.append({"folder": rel, "count": n})
+    stats.sort(key=lambda s: (s["count"], s["folder"]))
+    return stats
+
+
 def build_payload(root: Path, exact_groups, similar_pairs) -> dict:
     def file_info(p: Path) -> dict:
         try:
@@ -163,4 +181,5 @@ def build_payload(root: Path, exact_groups, similar_pairs) -> dict:
         "exact":   [{"files": [file_info(p) for p in g]} for g in exact_groups],
         "similar": [{"a": file_info(a), "b": file_info(b), "similarity": s}
                     for a, b, s in similar_pairs],
+        "stats":   folder_stats(root, collect_files(root)),
     }
