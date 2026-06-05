@@ -13,6 +13,7 @@
 * **Inline Editing**: Edit file contents directly within the comparison view. Click the **Edit** button on either side to replace the diff table with a text editor. Changes are cached locally and not written to disk until you confirm. Use the **Re-compare** button in the footer to recalculate the diff based on your edits.
 * **Batch Apply**: Use the **Apply Changes** button to execute all pending actions at once. Edited files are saved first, followed by deletions and moves. Files moved to a directory containing a file with the same name are automatically renamed to avoid conflicts.
 * **Media Control**: Optional exclusion of **images** from the similarity analysis.
+* **Folder Overview**: A dedicated **Ordner** tab shows a `tree`-style directory overview and a sortable table listing every folder alongside its file count (text and image files).
 
 ## Installation
 
